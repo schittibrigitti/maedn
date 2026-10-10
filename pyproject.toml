@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maedpy"
+version = "0.1.0"
+description = "Mensch aergere Dich nicht: Engine, Simulation, PvE-GUI und Trainings-Umgebung"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Felix Schleifer" }]
+dependencies = []
+
+[project.optional-dependencies]
+analysis = ["matplotlib>=3.8", "numpy>=1.26", "scipy>=1.13"]
+
+[tool.setuptools]
+packages = ["maedpy", "maedpy.bin"]

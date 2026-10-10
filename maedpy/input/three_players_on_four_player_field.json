@@ -1,0 +1,6 @@
+{
+    "n_players": 		3,
+    "size": 			40,
+	"start_positions":	[0,10,20],
+	"end_positions":	[39,9,19]
+}

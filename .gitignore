@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+
+# Generierte Daten (werden beim Spielen/Simulieren automatisch angelegt)
+maedpy/output/
+maedpy/output_test/
+maedpy/game_log.json
+maedpy/game_end.json
+maedpy/time_dep.json
+
+# Literatur und Office-Dokumente
+Literatur/
+*.docx
+*.xlsx
+~$*
+
+# Editor
+.vscode/
+
+# Build
+*.egg-info/
+build/
+dist/
