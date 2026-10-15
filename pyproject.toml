@@ -16,3 +16,6 @@ analysis = ["matplotlib>=3.8", "numpy>=1.26", "scipy>=1.13"]
 
 [tool.setuptools]
 packages = ["maedpy", "maedpy.bin"]
+
+[tool.setuptools.package-data]
+maedpy = ["game_mode.json"]

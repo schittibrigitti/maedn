@@ -15,6 +15,7 @@ except ImportError:
 
 
 PVE_OUTPUT_ROOT = Path(__file__).resolve().parent / 'output' / 'pve'
+GAME_MODES_PATH = Path(__file__).resolve().parent / 'game_mode.json'
 
 
 def _number_of_players(directory):
@@ -22,6 +23,40 @@ def _number_of_players(directory):
     if match is None:
         return None
     return int(match.group(1))
+
+
+def _configured_player_counts():
+    if not GAME_MODES_PATH.is_file():
+        return {}
+    with GAME_MODES_PATH.open(encoding='utf-8') as modes_file:
+        modes = json.load(modes_file)
+    return {
+        mode['name']: mode['parameters']['n_players']
+        for mode in modes
+        if isinstance(mode, dict)
+        and isinstance(mode.get('name'), str)
+        and isinstance(mode.get('parameters'), dict)
+        and isinstance(mode['parameters'].get('n_players'), int)
+    }
+
+
+def _player_count_for_directory(directory, configured_counts):
+    if directory.name in configured_counts:
+        return configured_counts[directory.name]
+    count = _number_of_players(directory)
+    if count is not None:
+        return count
+    for filepath in directory.glob('pve_game_*.json'):
+        try:
+            with filepath.open(encoding='utf-8') as game_file:
+                game = json.load(game_file)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(game, list) and game and isinstance(game[-1], dict):
+            positions = game[-1].get('positions')
+            if isinstance(positions, dict) and positions:
+                return len(positions)
+    return None
 
 
 def _winner_counts(directory, number_of_players):
@@ -51,7 +86,11 @@ def _winner_counts(directory, number_of_players):
 
 def create_winner_distribution(directory, number_of_players=None, output_root=None):
     directory = Path(directory)
-    number_of_players = number_of_players or _number_of_players(directory)
+    if number_of_players is None:
+        number_of_players = _player_count_for_directory(
+            directory,
+            _configured_player_counts()
+        )
     if number_of_players is None or number_of_players < 1:
         raise ValueError(f'Could not determine the player count for {directory}.')
 
@@ -97,10 +136,16 @@ def create_all_winner_distributions(output_root=PVE_OUTPUT_ROOT):
     if not output_root.is_dir():
         return created
 
+    configured_counts = _configured_player_counts()
     for directory in sorted(path for path in output_root.iterdir() if path.is_dir()):
-        if _number_of_players(directory) is None:
+        number_of_players = _player_count_for_directory(directory, configured_counts)
+        if number_of_players is None:
             continue
-        created.append(create_winner_distribution(directory, output_root=output_root))
+        created.append(create_winner_distribution(
+            directory,
+            number_of_players=number_of_players,
+            output_root=output_root
+        ))
     return created
 
 

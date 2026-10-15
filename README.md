@@ -1,4 +1,4 @@
-﻿# Mensch ärgere Dich nicht (MÄDN) – Simulation, PvE-GUI & Statistik
+# Mensch ärgere Dich nicht (MÄDN) – Simulation, PvE-GUI & Statistik
 
 Parametrisierbare Python-Implementierung von *Mensch ärgere Dich nicht*
 (englisch: Ludo). Das Projekt bietet:
@@ -99,6 +99,7 @@ MÄDN/
     ├── env.py               # MaednEnv: reset()/step()-Umgebung für KI-Training
     ├── main.py              # CLI-Einstieg: Bot-Simulation
     ├── maedn_PvE.py         # Tkinter-GUI: Mensch vs. Bots
+    ├── game_mode.json       # benannte PvE-Spielmodi mit Parametern
     ├── board_view.py        # BoardView: Zeichnen des Spielfelds (Canvas)
     ├── maedn_visualization.py  # Replay-Fenster für gespeicherte Logs
     ├── maedn_statistic.py   # Statistiken/Plots über Log-Ordner
@@ -132,7 +133,7 @@ Konfigurierbar über [Game_Mode](maedpy/bin/Game_class.py) (Dict oder JSON-Datei
 | `n_dice_sides`            | 6       | Würfelseiten; die höchste Zahl ist die „Sechs“ (Herausbringen + nochmal würfeln) |
 | `start_to_start_distance` | 10      | Felder zwischen zwei Startfeldern |
 | `n_rerolls`               | 3       | Würfelversuche, solange keine Figur im Spiel ist |
-| `knock_duty`              | `true`  | Schlagzwang: ist Schlagen möglich, sind nur schlagende Züge legal (per JSON oder PvE-Setup-Checkbox) |
+| `knock_duty`              | `true`  | Schlagzwang: ist Schlagen möglich, sind nur schlagende Züge legal (per JSON oder PvE-Modusdefinition) |
 | `clear_start_on_non_six`  | `true`  | Startfeld freimachen, auch wenn keine Sechs fällt (sofern noch Figuren draußen) |
 | `size`                    | berechnet | Wird nur übernommen, wenn größer als `n_players*start_to_start_distance` |
 | `player_names`            | `Player 1…n` | Spielernamen |
@@ -233,11 +234,24 @@ Zustand und Zuglogik eines Spielers: `can_enter`, `enter_piece`, `move_piece`, `
 `main(file_name=None, repetitions=1)`: Game_Mode laden → `simulate_game` → `output_results`, `repetitions`-mal.
 
 ### `maedpy/maedn_PvE.py`
-Tkinter-GUI (`PvEWindow`): Setup-Formular, Spielfeld (`BoardView`), Geschwindigkeitsmodi
+Tkinter-GUI (`PvEWindow`): dauerhafte Modusauswahl aus `game_mode.json`, Spielfeld (`BoardView`), Geschwindigkeitsmodi
 (`Skip`, `Manual`, `normal`, `fast`), Pause/Play/„Next frame“, Pfeile zur Zugauswahl
 (Zugoptionen mit `D`, `W`, `A`, `S` per Tastatur oder Klick auswählbar),
-Endedialog mit Rematch/Neues Spiel. Beendete Spiele werden automatisch nach
-`output/pve/<Parameterordner>/pve_game_<Zeitstempel>.json` gespeichert.
+Kein Endedialog: Nach Spielende erscheint in der Statuszeile YOU WIN! CONGRATULATIONS (läuft einmal quer über das Spielfeld; bei Sieg des Menschen, sonst Player N wins) und nach 5 s startet automatisch ein neues Spiel im selben Modus (läuft ohne erneutes Play los). Ein anderer Modus wird über das Dropdown gewählt. Beendete Spiele werden automatisch nach
+`output/pve/<Modusname>/pve_game_<Zeitstempel>.json` gespeichert. Die PvE-Spielmodi stehen in
+[`maedpy/game_mode.json`](maedpy/game_mode.json); das Dropdown bleibt sichtbar und beim Auswählen
+eines Namens startet direkt ein Spiel mit diesen Parametern.
+Neue Modi werden als Einträge mit `name` und `parameters` in der JSON-Liste ergänzt; Änderungen
+werden beim nächsten Programmstart eingelesen.
+
+| Name | Spieler | Abstand Startfelder | Bereits gespeicherte Partien |
+|------|--------:|--------------------:|-----------------------------:|
+| `Classic 4 Player Field` | 4 | 10 | 53 |
+| `Classic 6 Player Field` | 6 | 8 | 3 |
+| `2 Players on classic 4 Player Field` | 2 | 20 | 14 |
+| `2 Players on 24 Tiles` | 2 | 12 | 26 |
+
+Die übrigen Modi in `game_mode.json` haben noch keine Logs. PvE-Logs und Siegstatistiken verwenden den Modusnamen als Ordnernamen; ältere Ordner (Parameterstring, `modusN`) wurden zusammengeführt. Ältere Ordner mit höchstens zwei Partien bleiben unverändert.
 Hilfsfunktionen: `create_game`, `parameters_for_game`, `create_agents`, `save_pve_game`.
 
 ### `maedpy/board_view.py` – `BoardView`
@@ -252,8 +266,9 @@ Liest alle Logs eines Ordners (`game_end.json`, `time_dep.json` werden ignoriert
 Plots (Spielende-/Zeitverläufe) und schreibt nach `output/statistic/<Ordnername>/`.
 
 ### `maedpy/maedn_PvE_statistic.py`
-`create_all_winner_distributions()` – für jeden Ordner in `output/pve/` ein Tortendiagramm
-der Siege je Spieler (`<ordner>_statistic.png`); die schwarze Umrandung markiert den
+`create_all_winner_distributions()` – für jeden Modusordner in `output/pve/` ein Tortendiagramm
+der Siege je Spieler (`<Modusname>_statistic.png`); die Spielerzahl wird aus `game_mode.json`
+ermittelt; die schwarze Umrandung markiert den
 Erwartungswert (1/n_players, d. h. Fairness).
 
 ### `MADN.py` (Repo-Wurzel)
@@ -287,7 +302,7 @@ Ein Log ist eine JSON-Liste mit einem Eintrag pro Zug:
 
 - `roll number` ist die laufende Gesamt-Wurfnummer, `deliberate_moves` die kumulierte Zahl echter Entscheidungen.
 - Der **letzte Eintrag** eines Logs gehört dem Gewinner (`player`); `maedn_PvE_statistic.py` wertet genau das aus.
-- Bot-Logs: `output/<Parameter>/game_log_<Zeit>.json`; PvE-Logs: `output/pve/<Parameter>/pve_game_<Zeit>.json`.
+- Bot-Logs: `output/<Parameter>/game_log_<Zeit>.json`; PvE-Logs: `output/pve/<Modusname>/pve_game_<Zeit>.json`.
 
 ---
 
@@ -449,7 +464,7 @@ Mit festen `dice_rolls` und `start_positions` lassen sich Spielsituationen deter
   Beachte, dass die `deliberate_moves`-Zählung in `_resolve_regular_move` aktuell `RandomAgent` gesondert behandelt.
 - **Neuer Parameter:** in `Game_Mode.__init__` (Default + JSON-Lesen), in die `parameters`-Liste für `out_folder`
   aufnehmen (Achtung: ändert Ordnernamen und die Auswertungs-Annahme „erste Zahl = Spielerzahl“), in
-  `CLASSIC_DEFAULTS` / `parameters_for_game` / Setup-Formular der PvE-GUI ergänzen.
+  `CLASSIC_DEFAULTS` / `parameters_for_game` und die gewünschten Spielmodi in `game_mode.json` ergänzen.
 - **Positionen sind gemischt typisiert** (`-1`, `int`, `"house_k"`). Immer mit `isinstance` bzw.
   `Player._is_house_position` / `_house_slot` prüfen; nie numerisch vergleichen, ohne den Typ zu kennen.
 - **Log-Schema stabil halten** – Replay und Statistik hängen daran
@@ -487,5 +502,3 @@ Weitere Beobachtungen:
   Am sichersten: `MÄDN/` als Wurzel eines **neuen** Repos verwenden (`git init`), nicht den übergeordneten `github/`-Ordner,
   und ohne die alte Historie starten. Bereits getrackte Dateien werden von `.gitignore` nicht entfernt (`git rm -r --cached <pfad>`).
 - Lizenz: [MIT](LICENSE) © 2026 Felix Schleifer. Frei nutzbar (auch kommerziell), aber der Copyright-Hinweis und der Lizenztext müssen in allen Kopien und wesentlichen Teilen des Codes erhalten bleiben (Namensnennung).
-
-

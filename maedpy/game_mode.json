@@ -1,0 +1,93 @@
+[
+    {
+        "name": "Classic 4 Player Field",
+        "parameters": {
+            "n_players": 4,
+            "n_pieces": 4,
+            "n_pieces_to_win": 4,
+            "n_dice_sides": 6,
+            "start_to_start_distance": 10,
+            "n_rerolls": 3,
+            "clear_start_on_non_six": true,
+            "knock_duty": true
+        }
+    },
+    {
+        "name": "Classic 6 Player Field",
+        "parameters": {
+            "n_players": 6,
+            "n_pieces": 4,
+            "n_pieces_to_win": 4,
+            "n_dice_sides": 6,
+            "start_to_start_distance": 8,
+            "n_rerolls": 3,
+            "clear_start_on_non_six": true,
+            "knock_duty": true
+        }
+    },
+    {
+        "name": "2 Players on classic 6 Player Field",
+        "parameters": {
+            "n_players": 2,
+            "n_pieces": 4,
+            "n_pieces_to_win": 4,
+            "n_dice_sides": 6,
+            "start_to_start_distance": 24,
+            "n_rerolls": 3,
+            "clear_start_on_non_six": true,
+            "knock_duty": true
+        }
+    },
+    {
+        "name": "2 Players on classic 4 Player Field",
+        "parameters": {
+            "n_players": 2,
+            "n_pieces": 4,
+            "n_pieces_to_win": 4,
+            "n_dice_sides": 6,
+            "start_to_start_distance": 20,
+            "n_rerolls": 3,
+            "clear_start_on_non_six": true,
+            "knock_duty": true
+        }
+    },
+    {
+        "name": "3 Players on classic 6 Player Field",
+        "parameters": {
+            "n_players": 3,
+            "n_pieces": 4,
+            "n_pieces_to_win": 4,
+            "n_dice_sides": 6,
+            "start_to_start_distance": 16,
+            "n_rerolls": 3,
+            "clear_start_on_non_six": true,
+            "knock_duty": true
+        }
+    },
+        {
+        "name": "2 Players on 24 Tiles",
+        "parameters": {
+            "n_players": 2,
+            "n_pieces": 4,
+            "n_pieces_to_win": 4,
+            "n_dice_sides": 6,
+            "start_to_start_distance": 12,
+            "n_rerolls": 3,
+            "clear_start_on_non_six": true,
+            "knock_duty": true
+        }
+    },
+    {
+        "name": "3 Players on 30 Tiles",
+        "parameters": {
+            "n_players": 3,
+            "n_pieces": 4,
+            "n_pieces_to_win": 4,
+            "n_dice_sides": 6,
+            "start_to_start_distance": 10,
+            "n_rerolls": 3,
+            "clear_start_on_non_six": true,
+            "knock_duty": true
+        }
+    }
+]

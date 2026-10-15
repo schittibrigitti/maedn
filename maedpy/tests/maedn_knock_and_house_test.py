@@ -19,6 +19,7 @@ from maedn_PvE import (
     PvEWindow,
     create_agents,
     create_game,
+    load_game_modes,
     pve_output_directory,
     save_pve_game,
 )
@@ -396,45 +397,38 @@ def test_pause_resume_and_pve_save():
     step_window.step_frame()
     assert rendered_frames[-1] == {'frame': 3}
 
-    class FinishedSession:
-        finished = True
-
-    rematch_window = PvEWindow.__new__(PvEWindow)
-    rematch_window.session = FinishedSession()
-    rematch_window.saved_path = Path('saved-game.json')
-    rematch_window.end_dialog = None
-    rematch_window.game = create_game({'n_players': 3, 'n_pieces': 3, 'n_pieces_to_win': 3})
-    rematch_window.after_id = None
-
-    class RematchRoot:
-        destroyed = False
-
-        def destroy(self):
-            self.destroyed = True
-
-    rematch_window.root = RematchRoot()
-    rematch_window.rematch()
-    assert rematch_window.rematch_requested
-    assert rematch_window.rematch_parameters['n_players'] == 3
-    assert rematch_window.rematch_parameters['n_pieces'] == 3
-    assert rematch_window.root.destroyed
-
     log = [{'player': 'Player 1', 'rolls': [2], 'positions': {'Player 1': [1, -1]}}]
     assert pve_output_directory().parent.name == 'output'
     assert pve_output_directory().name == 'pve'
     setup_directory = pve_output_directory(create_game())
     assert setup_directory.parent.name == 'pve'
     assert setup_directory.name == Path(create_game().out_folder).name
+    names = [mode['name'] for mode in load_game_modes()]
+    assert len(names) >= 2 and len(set(names)) == len(names)
+    assert pve_output_directory(create_game(), names[0]).name == names[0]
+    modes = {mode['name']: mode['parameters'] for mode in load_game_modes()}
+    assert all(mode['n_players'] >= 2 for mode in modes.values())
     with tempfile.TemporaryDirectory() as directory:
         filepath = save_pve_game(log, output_dir=directory)
         assert filepath.name.startswith('pve_game_')
         assert json.loads(filepath.read_text(encoding='utf-8')) == log
 
-def test_game_end_dialog_auto_save_and_new_game():
+def test_game_end_auto_save_and_restart():
     root = tk.Tk()
     root.withdraw()
     window = PvEWindow(root)
-    window.start_game()
+    names = [mode['name'] for mode in load_game_modes()]
+    assert window.selected_mode_name == names[0] and window.mode_var.get() == names[0]
+    assert window.waiting_to_start
+    modes_by_name = {m['name']: m['parameters'] for m in load_game_modes()}
+    window.start_game(names[0])
+    assert window.mode_menu.cget('values') == tuple(names)
+    assert window.selected_mode_name == names[0]
+    two_player = next(n for n in names if modes_by_name[n]['n_players'] == 2)
+    window.start_game(two_player)
+    assert window.game.n_players == 2
+    assert window.mode_menu.winfo_exists()
+    window.start_game(names[0])
     assert window.speed_var.get() == 'Skip'
     assert window.session.roll_num == 0
     assert window.waiting_to_start and window.is_paused
@@ -451,23 +445,20 @@ def test_game_end_dialog_auto_save_and_new_game():
 
     with patch.object(pve_module, 'save_pve_game', return_value=expected_path) as save_game:
         window._handle_game_end()
-        save_game.assert_called_once_with(window.session.log, game=window.game)
+        save_game.assert_called_once_with(
+            window.session.log, game=window.game, mode_name=names[0]
+        )
 
     root.update_idletasks()
     assert window.saved_path == expected_path
-    buttons = []
-    pending = list(window.end_dialog.winfo_children())
-    while pending:
-        widget = pending.pop()
-        if isinstance(widget, ttk.Button):
-            buttons.append(widget.cget('text'))
-        pending.extend(widget.winfo_children())
-    assert {'Rematch', 'New Game', 'Exit'} <= set(buttons)
-
-    window.new_game()
-    assert window.game is None and window.session is None
-    assert window.setup_frame.winfo_exists()
-    assert window.parameter_vars['n_players'].get() == '4'
+    assert window.status_var.get() == 'YOU WIN! CONGRATULATIONS'
+    assert not hasattr(window, 'end_dialog')
+    assert window.after_id is not None
+    window._restart_after_game_end()
+    assert window.selected_mode_name == names[0]
+    assert window.session.winner is None and not window.waiting_to_start
+    window._cancel_pending_callback()
+    assert window.mode_menu.winfo_exists()
     root.destroy()
 
 def test_house_slots():
@@ -551,7 +542,7 @@ def main():
     print("Test PvE mode and animation frames PASSED")
     test_pause_resume_and_pve_save()
     print("Test pause/resume and PvE save PASSED")
-    test_game_end_dialog_auto_save_and_new_game()
+    test_game_end_auto_save_and_restart()
     print("Test game-end dialog and new game PASSED")
     
 if __name__ == "__main__":

@@ -1,2 +1,7 @@
 Checken ob Überspringen im Haus weiterhin verboten ist
 Signal wenn eine Figure ins Haus geht
+output komprimieren
+3 Spieler auf 4 Spieler Feld
+KI Spieler haben Skill von -1(immer gegenteil von der KI) über 0 (random) bis 1 (KI spieler).
+Ein wert von 0.4 heißt 0.4 Chance KI entscheiding zu nehmen und 0.6 random
+Jeder Spieler kann eine eigene KI Skillstufe haben

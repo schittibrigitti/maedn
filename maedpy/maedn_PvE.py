@@ -28,6 +28,8 @@ CLASSIC_DEFAULTS = {
     'clear_start_on_non_six': True,
     'knock_duty': True
 }
+GAME_RESTART_DELAY_MS = 5000
+BANNER_STEP_MS = 30
 FRAME_SPEEDS = {
     'Skip': None,
     'Manual': None,
@@ -35,6 +37,7 @@ FRAME_SPEEDS = {
     'fast': 100
 }
 ACTION_KEYS = ('d', 'w', 'a', 's')
+GAME_MODES_PATH = PACKAGE_DIR / 'game_mode.json'
 
 
 def action_labels(count):
@@ -62,24 +65,44 @@ def parameters_for_game(game):
     }
 
 
+def load_game_modes(filepath=GAME_MODES_PATH):
+    with Path(filepath).open(encoding='utf-8') as modes_file:
+        modes = json.load(modes_file)
+    if not isinstance(modes, list) or not modes:
+        raise ValueError('game_mode.json must contain a non-empty list.')
+
+    names = set()
+    for mode in modes:
+        if not isinstance(mode, dict) or not isinstance(mode.get('name'), str) or not mode['name'].strip():
+            raise ValueError('Every game mode must have a non-empty name.')
+        if mode['name'] != mode['name'].strip() or Path(mode['name']).name != mode['name']:
+            raise ValueError(f"Game mode name is not a valid folder name: {mode['name']}")
+        if mode['name'] in names:
+            raise ValueError(f"Duplicate game mode name: {mode['name']}")
+        if not isinstance(mode.get('parameters'), dict):
+            raise ValueError(f"Game mode {mode['name']} must contain a parameters object.")
+        names.add(mode['name'])
+    return modes
+
+
 def create_agents(n_players):
     if n_players < 1:
         raise ValueError('The game must have at least one player.')
     return [HumanAgent()] + [RandomAgent() for _ in range(n_players - 1)]
 
 
-def pve_output_directory(game=None):
+def pve_output_directory(game=None, mode_name=None):
     directory = PACKAGE_DIR / 'output' / 'pve'
     if game is not None:
-        directory /= Path(game.out_folder).name
+        directory /= mode_name or Path(game.out_folder).name
     return directory
 
 
-def save_pve_game(game_log, game=None, output_dir=None):
+def save_pve_game(game_log, game=None, output_dir=None, mode_name=None):
     if not game_log:
         raise ValueError('There is no completed game to save.')
 
-    directory = Path(output_dir) if output_dir is not None else pve_output_directory(game)
+    directory = Path(output_dir) if output_dir is not None else pve_output_directory(game, mode_name)
     directory.mkdir(parents=True, exist_ok=True)
     filename = f"pve_game_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')}.json"
     filepath = directory / filename
@@ -89,7 +112,7 @@ def save_pve_game(game_log, game=None, output_dir=None):
 
 
 class PvEWindow:
-    def __init__(self, root=None, initial_parameters=None):
+    def __init__(self, root=None):
         self.root = root or tk.Tk()
         self.root.title('Mensch ärgere Dich nicht - PvE')
         self.root.geometry('1040x940')
@@ -110,121 +133,61 @@ class PvEWindow:
         self.pending_actions = []
         self.pending_player = None
         self.pending_action_labels = []
+        self.game_modes = load_game_modes()
+        self.game_modes_by_name = {mode['name']: mode for mode in self.game_modes}
+        self.selected_mode_name = None
         self.saved_path = None
-        self.end_dialog = None
         self.game_end_handled = False
-        self.initial_parameters = dict(initial_parameters or {})
-        self.rematch_requested = False
-        self.rematch_parameters = None
-        self._build_setup_form()
-        if initial_parameters is not None:
-            self.start_game()
+        self.games_finished = 0
+        self._build_game_panel()
+        self.status_var.set('Select a game mode to start')
+        if self.game_modes:
+            self.start_game(self.game_modes[0]['name'])
 
-    def _build_setup_form(self):
-        if hasattr(self, 'game_frame') and self.game_frame.winfo_exists():
-            self.game_frame.destroy()
-        self.setup_frame = ttk.Frame(self.root, padding=24)
-        self.setup_frame.grid(row=0, column=0, sticky='nsew')
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
-        self.setup_frame.grid_columnconfigure(1, weight=1)
-
-        ttk.Label(
-            self.setup_frame,
-            text='Mensch ärgere Dich nicht',
-            font=('Segoe UI', 22, 'bold')
-        ).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 4))
-        ttk.Label(
-            self.setup_frame,
-            text='PvE setup - classic rules and board defaults',
-            font=('Segoe UI', 10)
-        ).grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 18))
-
-        fields = [
-            ('Players', 'n_players', 2, 10),
-            ('Pieces per player', 'n_pieces', 1, 10),
-            ('Pieces needed to win', 'n_pieces_to_win', 1, 10),
-            ('Die sides', 'n_dice_sides', 2, 20),
-            ('Distance between starts', 'start_to_start_distance', 2, 30),
-            ('Rerolls with no pieces in play', 'n_rerolls', 1, 10)
-        ]
-        self.parameter_vars = {}
-        for row, (label, name, minimum, maximum) in enumerate(fields, start=2):
-            initial_value = self.initial_parameters.get(name, CLASSIC_DEFAULTS[name])
-            variable = tk.StringVar(value=str(initial_value))
-            self.parameter_vars[name] = variable
-            ttk.Label(self.setup_frame, text=label).grid(row=row, column=0, sticky='w', padx=(0, 20), pady=5)
-            ttk.Spinbox(
-                self.setup_frame,
-                from_=minimum,
-                to=maximum,
-                textvariable=variable,
-                width=12
-            ).grid(row=row, column=1, sticky='ew', pady=5)
-
-        self.clear_start_var = tk.BooleanVar(
-            value=self.initial_parameters.get(
-                'clear_start_on_non_six',
-                CLASSIC_DEFAULTS['clear_start_on_non_six']
-            )
-        )
-        ttk.Checkbutton(
-            self.setup_frame,
-            text='Move a piece from the start field on non-six rolls when possible',
-            variable=self.clear_start_var
-        ).grid(row=8, column=0, columnspan=2, sticky='w', pady=(10, 4))
-
-        self.knock_duty_var = tk.BooleanVar(
-            value=self.initial_parameters.get('knock_duty', CLASSIC_DEFAULTS['knock_duty'])
-        )
-        ttk.Checkbutton(
-            self.setup_frame,
-            text='Knock duty: capturing is mandatory when possible',
-            variable=self.knock_duty_var
-        ).grid(row=9, column=0, columnspan=2, sticky='w', pady=(0, 18))
-
-        self.start_button = ttk.Button(self.setup_frame, text='Start game', command=self.start_game)
-        self.start_button.grid(row=10, column=0, columnspan=2, sticky='ew', pady=(6, 0))
-
-    def start_game(self):
+    def start_game(self, mode_name=None):
+        mode_name = mode_name or self.mode_var.get()
+        if mode_name not in self.game_modes_by_name:
+            return
+        self._cancel_pending_callback()
         try:
-            parameters = {
-                name: int(variable.get())
-                for name, variable in self.parameter_vars.items()
-            }
-            parameters['clear_start_on_non_six'] = self.clear_start_var.get()
-            parameters['knock_duty'] = self.knock_duty_var.get()
+            parameters = dict(self.game_modes_by_name[mode_name]['parameters'])
             if parameters['n_pieces_to_win'] > parameters['n_pieces']:
                 raise ValueError('Pieces needed to win cannot exceed pieces per player.')
             self.game = create_game(parameters)
             self.game_parameters = parameters
-        except (ValueError, TypeError) as error:
-            messagebox.showerror('Invalid game setup', str(error), parent=self.root)
+        except (KeyError, TypeError, ValueError) as error:
+            messagebox.showerror('Invalid game mode', str(error), parent=self.root)
             return
 
+        self.selected_mode_name = mode_name
         self.session = GameSession(
             self.game,
             agents=create_agents(self.game.n_players)
         )
         self.saved_path = None
         self.game_end_handled = False
+        self.pending_actions = []
+        self.pending_action_labels = []
+        self.pending_player = None
+        self.animation_frames = []
+        self.animation_index = 0
+        self.display_state = None
         self.manual_mode = False
         self.waiting_to_start = True
-        self._build_game_panel()
+        self.board = BoardView(self.canvas, game=self.game)
         self.skip_animation = self.speed_var.get() == 'Skip'
         self.manual_mode = self.speed_var.get() == 'Manual'
         self.frame_delay = FRAME_SPEEDS[self.speed_var.get()] or 0
         self.is_paused = True
         self.pause_button.configure(text='Play', state='normal')
         self.step_button.configure(state='disabled')
-        self.status_var.set('Paused - press Play to start')
+        self.mode_var.set(mode_name)
+        self.status_var.set(f'{mode_name} - Paused - press Play to start')
         self._render_state(self.session.snapshot())
+        if self.games_finished > 0:
+            self.toggle_pause()
 
     def _build_game_panel(self):
-        if hasattr(self, 'setup_frame') and self.setup_frame.winfo_exists():
-            self.setup_frame.destroy()
-        if hasattr(self, 'game_frame') and self.game_frame.winfo_exists():
-            self.game_frame.destroy()
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
         self.game_frame = ttk.Frame(self.root, padding=(12, 8))
@@ -235,13 +198,24 @@ class PvEWindow:
         header = ttk.Frame(self.game_frame)
         header.grid(row=0, column=0, sticky='ew', pady=(0, 6))
         header.grid_columnconfigure(0, weight=1)
-        self.status_var = tk.StringVar(value='Starting game')
+        self.status_var = tk.StringVar(value='Select a game mode to start')
         ttk.Label(header, textvariable=self.status_var, font=('Segoe UI', 12, 'bold')).grid(
             row=0, column=0, sticky='w'
         )
 
+        self.mode_var = tk.StringVar(value='')
+        self.mode_menu = ttk.Combobox(
+            header,
+            values=tuple(self.game_modes_by_name),
+            textvariable=self.mode_var,
+            state='readonly',
+            width=max(16, max(map(len, self.game_modes_by_name), default=0) + 2)
+        )
+        self.mode_menu.grid(row=0, column=1, sticky='e', padx=(8, 8))
+        self.mode_menu.bind('<<ComboboxSelected>>', self._on_mode_selected)
+
         speed_controls = ttk.Frame(header)
-        speed_controls.grid(row=0, column=1, sticky='e')
+        speed_controls.grid(row=0, column=2, sticky='e')
         ttk.Label(speed_controls, text='Frame speed').pack(side='left', padx=(0, 8))
         self.speed_var = tk.StringVar(value='Skip')
         self.speed_menu = ttk.Combobox(
@@ -269,9 +243,12 @@ class PvEWindow:
         self.step_button.pack(side='left', padx=4)
         self.canvas = tk.Canvas(self.game_frame, background='white', highlightthickness=1, highlightbackground='#cbd5e1')
         self.canvas.grid(row=1, column=0, sticky='nsew')
-        self.board = BoardView(self.canvas, game=self.game)
+        self.board = BoardView(self.canvas)
         self.canvas.bind('<Configure>', self._on_canvas_resize)
         self.root.bind_all('<KeyPress>', self._handle_action_key)
+
+    def _on_mode_selected(self, event=None):
+        self.start_game(self.mode_var.get())
 
     def _update_speed(self, event=None):
         selected_speed = self.speed_var.get()
@@ -622,89 +599,61 @@ class PvEWindow:
         if self.game_end_handled:
             return
         self.game_end_handled = True
+        self.games_finished += 1
         self._render_state(self.session.snapshot())
-        self.status_var.set(f"{self.session.winner} wins")
+        human_won = self.session.winner == self.session.players[0].name
+        message = 'YOU WIN! CONGRATULATIONS' if human_won else f"{self.session.winner} wins"
+        self.status_var.set(message)
+        self._scroll_banner(message)
         self.pause_button.configure(state='disabled')
         self.step_button.configure(state='disabled')
 
         try:
-            self.saved_path = save_pve_game(self.session.log, game=self.game)
+            self.saved_path = save_pve_game(
+                self.session.log,
+                game=self.game,
+                mode_name=self.selected_mode_name
+            )
         except OSError as error:
             self.saved_path = None
             messagebox.showerror('Could not save game', str(error), parent=self.root)
-        self._show_game_end_dialog()
+        self.after_id = self.root.after(GAME_RESTART_DELAY_MS, self._restart_after_game_end)
 
-    def _show_game_end_dialog(self):
-        if self.end_dialog is not None and self.end_dialog.winfo_exists():
+    def _restart_after_game_end(self):
+        self.after_id = None
+        self.start_game(self.selected_mode_name)
+
+    def _scroll_banner(self, text):
+        # Text läuft einmal von rechts nach links über das Spielfeld
+        self.canvas.update_idletasks()
+        width = max(self.canvas.winfo_width(), 1)
+        item = self.canvas.create_text(
+            width, self.canvas.winfo_height() / 2, text=text, anchor='w',
+            font=('Segoe UI', 40, 'bold'), fill='#c0392b'
+        )
+        end_x = -(self.canvas.bbox(item)[2] - self.canvas.bbox(item)[0])
+        steps = max(1, (GAME_RESTART_DELAY_MS - 200) // BANNER_STEP_MS)
+        dx = (end_x - width) / steps
+        self._banner_step(item, dx, steps)
+
+    def _banner_step(self, item, dx, steps_left):
+        self.banner_id = None
+        if steps_left <= 0:
+            self.canvas.delete(item)
             return
-
-        dialog = tk.Toplevel(self.root)
-        self.end_dialog = dialog
-        dialog.title('Game over')
-        dialog.transient(self.root)
-        dialog.resizable(False, False)
-        dialog.protocol('WM_DELETE_WINDOW', self.close)
-
-        content = ttk.Frame(dialog, padding=20)
-        content.grid(row=0, column=0, sticky='nsew')
-        ttk.Label(
-            content,
-            text=f'{self.session.winner} wins',
-            font=('Segoe UI', 16, 'bold')
-        ).grid(row=0, column=0, columnspan=3, sticky='w', pady=(0, 14))
-        if self.saved_path is not None:
-            ttk.Label(content, text=f'Saved: {self.saved_path}').grid(
-                row=1, column=0, columnspan=3, sticky='w', pady=(0, 14)
-            )
-
-        button_row = ttk.Frame(content)
-        button_row.grid(row=2, column=0, columnspan=3, sticky='ew')
-        ttk.Button(
-            button_row,
-            text='Rematch',
-            command=self.rematch,
-            state='normal' if self.saved_path is not None else 'disabled'
-        ).pack(side='left', padx=(0, 6))
-        ttk.Button(
-            button_row, text='New Game', command=self.new_game
-        ).pack(side='left', padx=6)
-        ttk.Button(
-            button_row, text='Exit', command=self.close
-        ).pack(side='left', padx=(6, 0))
-
-        dialog.grab_set()
-        dialog.focus_set()
-
-    def rematch(self):
-        if not self.session.finished or self.saved_path is None:
-            return
-        self.rematch_parameters = parameters_for_game(self.game)
-        self.rematch_requested = True
-        if self.end_dialog is not None and self.end_dialog.winfo_exists():
-            self.end_dialog.destroy()
-        self.close()
-
-    def new_game(self):
-        if self.end_dialog is not None and self.end_dialog.winfo_exists():
-            self.end_dialog.destroy()
-        self._cancel_pending_callback()
-        self.initial_parameters = parameters_for_game(self.game)
-        self.session = None
-        self.game = None
-        self.board = None
-        self.saved_path = None
-        self.game_end_handled = False
-        self.skip_animation = False
-        self.is_paused = False
-        self.manual_mode = False
-        self.animation_frames = []
-        self.animation_index = 0
-        self.display_state = None
-        self.pending_actions = []
-        self.pending_player = None
-        self._build_setup_form()
+        self.canvas.move(item, dx, 0)
+        self.banner_id = self.root.after(
+            BANNER_STEP_MS, self._banner_step, item, dx, steps_left - 1
+        )
 
     def _cancel_pending_callback(self):
+        banner_id = getattr(self, 'banner_id', None)
+        if banner_id is not None:
+            try:
+                self.root.after_cancel(banner_id)
+            except tk.TclError:
+                pass
+            self.banner_id = None
         if self.after_id is not None:
             try:
                 self.root.after_cancel(self.after_id)
@@ -735,14 +684,9 @@ class PvEWindow:
 
 
 def main():
-    initial_parameters = None
-    while True:
-        root = tk.Tk()
-        window = PvEWindow(root, initial_parameters=initial_parameters)
-        root.mainloop()
-        if not window.rematch_requested:
-            return
-        initial_parameters = window.rematch_parameters
+    root = tk.Tk()
+    PvEWindow(root)
+    root.mainloop()
 
 
 if __name__ == '__main__':
