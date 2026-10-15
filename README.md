@@ -234,7 +234,8 @@ Zustand und Zuglogik eines Spielers: `can_enter`, `enter_piece`, `move_piece`, `
 
 ### `maedpy/maedn_PvE.py`
 Tkinter-GUI (`PvEWindow`): Setup-Formular, Spielfeld (`BoardView`), Geschwindigkeitsmodi
-(`Skip`, `Manual`, `normal`, `fast`), Pause/Play/„Next frame“, Pfeile zur Zugauswahl,
+(`Skip`, `Manual`, `normal`, `fast`), Pause/Play/„Next frame“, Pfeile zur Zugauswahl
+(Zugoptionen mit `D`, `W`, `A`, `S` per Tastatur oder Klick auswählbar),
 Endedialog mit Rematch/Neues Spiel. Beendete Spiele werden automatisch nach
 `output/pve/<Parameterordner>/pve_game_<Zeitstempel>.json` gespeichert.
 Hilfsfunktionen: `create_game`, `parameters_for_game`, `create_agents`, `save_pve_game`.
@@ -486,6 +487,5 @@ Weitere Beobachtungen:
   Am sichersten: `MÄDN/` als Wurzel eines **neuen** Repos verwenden (`git init`), nicht den übergeordneten `github/`-Ordner,
   und ohne die alte Historie starten. Bereits getrackte Dateien werden von `.gitignore` nicht entfernt (`git rm -r --cached <pfad>`).
 - Lizenz: [MIT](LICENSE) © 2026 Felix Schleifer. Frei nutzbar (auch kommerziell), aber der Copyright-Hinweis und der Lizenztext müssen in allen Kopien und wesentlichen Teilen des Codes erhalten bleiben (Namensnennung).
-
 
 

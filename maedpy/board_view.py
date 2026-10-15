@@ -172,7 +172,7 @@ class BoardView:
 
         return state
 
-    def draw_action_arrows(self, player_name, actions, on_select):
+    def draw_action_arrows(self, player_name, actions, on_select, labels=None):
         player = self.players.get(player_name)
         if player is None:
             return []
@@ -185,7 +185,7 @@ class BoardView:
             if start is None or destination is None:
                 continue
 
-            letter = chr(ord('A') + index)
+            letter = labels[index] if labels is not None else chr(ord('A') + index)
             tag = f'pve-action-{index}'
             self.canvas.create_line(
                 *start, *destination,

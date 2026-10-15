@@ -4,6 +4,7 @@ import tempfile
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
+from types import SimpleNamespace
 from unittest.mock import patch
 sys.path.append('../bin/')
 sys.path.append('../')
@@ -120,8 +121,10 @@ def test_house_slots_are_drawn():
         {'piece_index': 0, 'from': 1, 'to': 2},
         {'piece_index': 1, 'from': 5, 'to': 6}
     ]
-    letters = view.draw_action_arrows('Player 1', actions, selected_actions.append)
-    assert letters == ['A', 'B']
+    letters = view.draw_action_arrows(
+        'Player 1', actions, selected_actions.append, labels=['D', 'W']
+    )
+    assert letters == ['D', 'W']
     assert len(canvas.lines) == 2
     canvas.bindings['pve-action-1'](None)
     assert selected_actions == [actions[1]]
@@ -287,19 +290,25 @@ def test_pve_mode_and_animation_frames():
         def render(self, state):
             self.renders += 1
 
-        def draw_action_arrows(self, player, actions, callback):
+        def draw_action_arrows(self, player, actions, callback, labels=None):
             self.actions = actions
-            return ['A']
+            return labels
 
     choice_window = PvEWindow.__new__(PvEWindow)
     choice_window.game = game
     choice_window.session = session
     choice_window.board = FakeBoard()
     choice_window.status_var = FakeStatus()
+    choice_window.pending_actions = []
     ahead_action = {'piece_index': 0, 'from': 2, 'to': 7}
     behind_action = {'piece_index': 1, 'from': 25, 'to': 1}
     choice_window._show_decisions('Player 1', [behind_action, ahead_action], 5)
     assert choice_window.pending_actions == [ahead_action, behind_action]
+    assert choice_window.pending_action_labels == ['D', 'W']
+    selected_actions = []
+    choice_window._choose_action = selected_actions.append
+    choice_window._handle_action_key(SimpleNamespace(char='w'))
+    assert selected_actions == [behind_action]
 
     skip_window = PvEWindow.__new__(PvEWindow)
     skip_window.session = FakeSession()

@@ -34,6 +34,12 @@ FRAME_SPEEDS = {
     'normal': 500,
     'fast': 100
 }
+ACTION_KEYS = ('d', 'w', 'a', 's')
+
+
+def action_labels(count):
+    keys = [key.upper() for key in ACTION_KEYS[:count]]
+    return keys + [str(index + 1) for index in range(len(keys), count)]
 
 
 def create_game(parameters=None):
@@ -103,6 +109,7 @@ class PvEWindow:
         self.display_state = None
         self.pending_actions = []
         self.pending_player = None
+        self.pending_action_labels = []
         self.saved_path = None
         self.end_dialog = None
         self.game_end_handled = False
@@ -264,6 +271,7 @@ class PvEWindow:
         self.canvas.grid(row=1, column=0, sticky='nsew')
         self.board = BoardView(self.canvas, game=self.game)
         self.canvas.bind('<Configure>', self._on_canvas_resize)
+        self.root.bind_all('<KeyPress>', self._handle_action_key)
 
     def _update_speed(self, event=None):
         selected_speed = self.speed_var.get()
@@ -309,7 +317,8 @@ class PvEWindow:
             self.board.draw_action_arrows(
                 self.pending_player,
                 self.pending_actions,
-                self._choose_action
+                self._choose_action,
+                self.pending_action_labels
             )
 
     def _is_animating(self):
@@ -553,20 +562,35 @@ class PvEWindow:
 
         actions = sorted(actions, key=progress, reverse=True)
         self.pending_actions = actions
+        self.pending_action_labels = action_labels(len(actions))
         letters = self.board.draw_action_arrows(
             player,
             actions,
-            self._choose_action
+            self._choose_action,
+            self.pending_action_labels
         )
         choices = ', '.join(letters)
-        self.status_var.set(
-            f'{player} rolled {roll} - click an arrow label: {choices}'
+        keyboard_choices = ', '.join(
+            f'{key.upper()} (Figur {index + 1})'
+            for index, key in enumerate(ACTION_KEYS[:len(actions)])
         )
+        self.status_var.set(
+            f'{player} rolled {roll} - click {choices} or press {keyboard_choices}'
+        )
+
+    def _handle_action_key(self, event):
+        key = event.char.lower()
+        if key not in ACTION_KEYS:
+            return
+        action_index = ACTION_KEYS.index(key)
+        if action_index < len(self.pending_actions):
+            self._choose_action(self.pending_actions[action_index])
 
     def _choose_action(self, action):
         result = self.session.choose_action(action)
         self.pending_player = None
         self.pending_actions = []
+        self.pending_action_labels = []
         self.status_var.set(f"{result['player']} selected a move")
         if self.skip_animation:
             self._render_state(result['state'])
