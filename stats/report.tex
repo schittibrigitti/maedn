@@ -1,0 +1,146 @@
+% Bericht zu Mensch ärgere dich nicht: EvE- vs. PvE-Statistik.
+% Vorher: python collect_stats.py   (erzeugt generated/*.csv und generated/pies.tex)
+% Dann:   pdflatex report.tex  (zweimal nicht nötig)
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath}
+\usepackage{pgfplots}
+\usepackage{pgf-pie}
+\usepackage{float}
+\pgfplotsset{compat=1.16, table/col sep=comma}
+
+\input{generated/modes.tex}
+\definecolor{eveColor}{RGB}{200,40,40}
+\definecolor{pveColor}{RGB}{35,90,200}
+
+% #1 = Metrik, #2 = Achsenbeschriftung, #3 = ymax (Platz für die Beschriftung über den Balken)
+\newcommand{\lengthplot}[3]{%
+\begin{tikzpicture}
+\begin{axis}[
+  bar width=10pt,
+  width=\textwidth, height=10cm,
+  ymin=0, ymax=#3,
+  ylabel={#2},
+  xtick={0,...,\modelast},
+  xticklabels/.expand once=\modelist,
+  xticklabel style={rotate=90, anchor=east, font=\small},
+  enlarge x limits=0.07,
+  ymajorgrids, major grid style={dotted,gray},
+  legend style={at={(0.5,1.04)}, anchor=south, legend columns=-1, font=\small},
+  error bars/error bar style={black!70},
+  error bars/error mark options={mark size=3pt, black!70},
+]
+\addplot+[ybar, fill=eveColor, draw=eveColor!70!black, bar shift=0pt, mark=none,
+  error bars/.cd, y dir=both, y explicit]
+  table[x expr=\coordindex-0.2, y=EvE_#1_mean, y error=EvE_#1_std] {generated/lengths.csv};
+\addplot+[ybar, fill=pveColor, draw=pveColor!70!black, bar shift=0pt, mark=none,
+  error bars/.cd, y dir=both, y explicit]
+  table[x expr=\coordindex+0.2, y=PvE_#1_mean, y error=PvE_#1_std] {generated/lengths.csv};
+% unsichtbare Balken auf Höhe Mittelwert + StabW tragen die Beschriftung (Wert und n)
+\addplot[ybar, draw=none, fill=none, bar shift=0pt, mark=none, forget plot,
+  nodes near coords, point meta=explicit symbolic,
+  every node near coord/.style={rotate=90, anchor=west, font=\scriptsize, text=eveColor!80!black}]
+  table[x expr=\coordindex-0.2, y=EvE_#1_top, meta=EvE_#1_label] {generated/lengths.csv};
+\addplot[ybar, draw=none, fill=none, bar shift=0pt, mark=none, forget plot,
+  nodes near coords, point meta=explicit symbolic,
+  every node near coord/.style={rotate=90, anchor=west, font=\scriptsize, text=pveColor!80!black}]
+  table[x expr=\coordindex+0.2, y=PvE_#1_top, meta=PvE_#1_label] {generated/lengths.csv};
+\legend{EvE (Computer gegen Computer), PvE (Mensch gegen Computer)}
+\end{axis}
+\end{tikzpicture}}
+\title{Mensch ärgere dich nicht\\Statistischer Vergleich von EvE- und PvE-Spielen}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Datengrundlage}
+Ausgewertet werden alle gespeicherten Spielprotokolle je Spielmodus aus
+\texttt{game\_mode.json}. \textbf{EvE}-Spiele (rot) sind simulierte Partien, in denen
+alle Spieler zufällig unter den erlaubten Zügen wählen; \textbf{PvE}-Spiele (blau) sind
+Partien, in denen ein Mensch gegen zufällig ziehende Computerspieler antritt. Die
+Stichprobengröße $n$ steht an jedem Balken. Modi ohne PvE-Spiele zeigen $n=0$ und
+einen leeren Balken.
+
+Einige Modi nutzen ein Brett, das für mehr Spieler ausgelegt ist, als tatsächlich
+mitspielen (z.\,B.\ drei Spieler auf dem Vierer-Brett, Sitze 1, 2 und 4). Dadurch sind
+die Abstände zwischen den Startfeldern ungleich.
+
+\section{Spiellänge}
+Alle drei Diagramme zeigen den Mittelwert je Spielmodus. Der schwarze Fehlerbalken
+ist die Standardabweichung der Spiellänge. Je Modus stehen zwei Balken nebeneinander:
+oben EvE (rot), darunter PvE (blau).
+
+\subsection{Würfe}
+Gesamtzahl der Würfelwürfe bis zum Spielende, einschließlich der bis zu drei Versuche,
+mit denen ein Spieler versucht, eine Figur aus dem Haus zu bekommen.
+
+\begin{figure}[H]\centering
+\lengthplot{rolls}{Würfe pro Spiel}{3000}
+\caption{Durchschnittliche Anzahl der Würfelwürfe pro Spiel.}
+\end{figure}
+
+\subsection{Runden}
+Eine Runde ist ein vollständiger Umlauf, in dem jeder Spieler einmal an der Reihe war.
+Spiele mit weniger Spielern oder kürzeren Brettern enden in weniger Würfen, nicht
+unbedingt in weniger Runden.
+
+\begin{figure}[H]\centering
+\lengthplot{rounds}{Runden pro Spiel}{550}
+\caption{Durchschnittliche Anzahl der Runden pro Spiel.}
+\end{figure}
+
+\subsection{Einzelne Züge}
+Gezählt werden alle einzelnen Zugeinträge im Protokoll. Würfelt ein Spieler eine
+Sechs, zieht er erneut, was einen zusätzlichen Zug erzeugt. Die Zahl liegt daher über
+der Rundenzahl multipliziert mit der Spielerzahl.
+
+\begin{figure}[H]\centering
+\lengthplot{moves}{Züge pro Spiel}{2800}
+\caption{Durchschnittliche Anzahl einzelner Züge pro Spiel.}
+\end{figure}
+
+\section{Zugcharakteristik}
+\subsection{Würfe pro Zug}
+Mittlere Zahl der Würfelwürfe je Zug (Zugeintrag). Der Wert liegt knapp über~1, weil
+nur ein Spieler ohne Figur auf dem Brett bis zu dreimal würfeln darf, um eine Sechs zu
+erhalten.
+
+\begin{figure}[H]\centering
+\lengthplot{rolls_per_move}{Würfe pro Zug}{1.8}
+\caption{Durchschnittliche Zahl der Würfe pro Zug.}
+\end{figure}
+
+\subsection{Anteil der Züge mit Entscheidung}
+Anteil der Züge, in denen der Spieler tatsächlich zwischen mehreren sinnvollen Figuren
+wählen musste. Ein Wert von 30\,\% heißt: Nur etwa jeder dritte Zug erfordert eine
+Entscheidung; in allen anderen Zügen ist der Zug erzwungen oder es gibt keine Wahl
+(z.\,B.\ gilt die Hausregel, dass Einziehen oder Vorrücken im Haus Vorrang hat).
+
+\begin{figure}[H]\centering
+\lengthplot{decision_share}{Züge mit Entscheidung in \%}{50}
+\caption{Anteil der Züge mit echter Entscheidungsmöglichkeit.}
+\end{figure}
+
+\section{Vorsprung des Siegers}
+Beim Spielende wird gezählt, wie viele Figuren die übrigen Spieler bereits im Haus
+hatten, gemittelt über alle Gegner. Ein kleiner Wert bedeutet einen deutlichen
+Vorsprung des Siegers, ein hoher Wert (maximal die Figurenzahl) ein knappes Rennen.
+
+\begin{figure}[H]\centering
+\lengthplot{opponent_house}{Figuren der Gegner im Haus}{4}
+\caption{Durchschnittliche Zahl der Figuren im Haus je Gegner bei Spielende.}
+\end{figure}
+\section{Siegverteilung}
+Anteil der Siege je Spieler (Farben: Spieler~1 rot, 2 blau, 3 grün, 4 orange,
+5 violett, 6 braun). Links steht jeweils EvE, rechts PvE. Bei fairem Spiel gewinnt
+jeder Spieler mit dem Anteil $1/n_\text{Spieler}$. Beim PvE-Modus ist Spieler~1 der
+Mensch.
+
+\input{generated/pies.tex}
+
+\end{document}

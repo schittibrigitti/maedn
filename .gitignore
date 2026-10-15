@@ -22,3 +22,5 @@ Literatur/
 *.egg-info/
 build/
 dist/
+stats/*.log
+stats/*.aux

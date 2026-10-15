@@ -15,7 +15,18 @@ except ImportError:
 
 
 PVE_OUTPUT_ROOT = Path(__file__).resolve().parent / 'output' / 'pve'
+STATISTIC_OUTPUT_ROOT = Path(__file__).resolve().parent / 'output' / 'statistic'
+DEFAULT_OUTPUT_ROOTS = (PVE_OUTPUT_ROOT, STATISTIC_OUTPUT_ROOT)
+GAME_FILE_PATTERNS = ('pve_game_*.json', 'game_log_*.json')
 GAME_MODES_PATH = Path(__file__).resolve().parent / 'game_mode.json'
+
+
+def _game_files(directory):
+    return sorted(
+        filepath
+        for pattern in GAME_FILE_PATTERNS
+        for filepath in Path(directory).glob(pattern)
+    )
 
 
 def _number_of_players(directory):
@@ -46,7 +57,7 @@ def _player_count_for_directory(directory, configured_counts):
     count = _number_of_players(directory)
     if count is not None:
         return count
-    for filepath in directory.glob('pve_game_*.json'):
+    for filepath in _game_files(directory):
         try:
             with filepath.open(encoding='utf-8') as game_file:
                 game = json.load(game_file)
@@ -63,7 +74,7 @@ def _winner_counts(directory, number_of_players):
     counts = [0] * number_of_players
     total_games = 0
 
-    for filepath in sorted(directory.glob('pve_game_*.json')):
+    for filepath in _game_files(directory):
         try:
             with filepath.open(encoding='utf-8') as game_file:
                 game = json.load(game_file)
@@ -130,22 +141,29 @@ def create_winner_distribution(directory, number_of_players=None, output_root=No
     return output_path, counts, total_games
 
 
-def create_all_winner_distributions(output_root=PVE_OUTPUT_ROOT):
-    output_root = Path(output_root)
-    created = []
-    if not output_root.is_dir():
-        return created
+def create_all_winner_distributions(output_root=None):
+    if output_root is None:
+        output_roots = DEFAULT_OUTPUT_ROOTS
+    elif isinstance(output_root, (str, Path)):
+        output_roots = (output_root,)
+    else:
+        output_roots = output_root
 
+    created = []
     configured_counts = _configured_player_counts()
-    for directory in sorted(path for path in output_root.iterdir() if path.is_dir()):
-        number_of_players = _player_count_for_directory(directory, configured_counts)
-        if number_of_players is None:
+    for root in output_roots:
+        root = Path(root)
+        if not root.is_dir():
             continue
-        created.append(create_winner_distribution(
-            directory,
-            number_of_players=number_of_players,
-            output_root=output_root
-        ))
+        for directory in sorted(path for path in root.iterdir() if path.is_dir()):
+            number_of_players = _player_count_for_directory(directory, configured_counts)
+            if number_of_players is None or not _game_files(directory):
+                continue
+            created.append(create_winner_distribution(
+                directory,
+                number_of_players=number_of_players,
+                output_root=root
+            ))
     return created
 
 
