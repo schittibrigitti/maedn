@@ -58,6 +58,8 @@ def create_game(parameters=None):
 def parameters_for_game(game):
     return {
         'n_players': game.n_players,
+        'nominal_players': game.nominal_players,
+        'player_positions': list(game.player_positions),
         'n_pieces': game.n_pieces,
         'n_pieces_to_win': game.n_pieces_to_win,
         'n_dice_sides': game.n_dice_sides,

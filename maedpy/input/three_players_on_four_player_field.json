@@ -1,6 +1,6 @@
 {
-    "n_players": 		3,
-    "size": 			40,
-	"start_positions":	[0,10,20],
-	"end_positions":	[39,9,19]
+    "nominal_players": 4,
+    "n_players": 3,
+    "player_positions": [1, 2, 4],
+    "start_to_start_distance": 10
 }

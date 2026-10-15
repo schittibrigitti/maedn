@@ -89,5 +89,20 @@
             "clear_start_on_non_six": true,
             "knock_duty": true
         }
+    },
+    {
+        "name": "3 Players on classic 4 Player Field",
+        "parameters": {
+            "nominal_players": 4,
+            "n_players": 3,
+            "player_positions": [1, 2, 4],
+            "n_pieces": 4,
+            "n_pieces_to_win": 4,
+            "n_dice_sides": 6,
+            "start_to_start_distance": 10,
+            "n_rerolls": 3,
+            "clear_start_on_non_six": true,
+            "knock_duty": true
+        }
     }
 ]
