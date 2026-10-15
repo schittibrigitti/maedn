@@ -434,6 +434,19 @@ def test_game_end_auto_save_and_restart():
     assert window.waiting_to_start and window.is_paused
     assert window.pause_button.cget('text') == 'Play'
     window._cancel_pending_callback()
+    assert window.volume_button.level == 2
+    for expected in (3, 0, 1, 2):
+        window.volume_button._on_click()
+        assert window.volume_button.level == expected
+    with patch.object(pve_module, 'play_ping') as ping:
+        window._play_house_sound({'moves': [{'to': 'house_2', 'from': 5}]})
+        window._play_house_sound({'moves': [{'to': 'house_3', 'from': 'house_2'}]})
+        window._play_house_sound({'moves': [{'to': 7, 'from': 5}]})
+        ping.assert_called_once_with(2)
+    from sound import make_ping_wav
+    assert make_ping_wav(0) is None
+    assert len(make_ping_wav(1)) == len(make_ping_wav(3)) > 1000
+    assert make_ping_wav(1) != make_ping_wav(3)
     window.session.winner = window.session.players[0].name
     window.session.log = [{
         'player': window.session.winner,

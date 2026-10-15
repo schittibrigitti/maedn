@@ -1,4 +1,3 @@
-Checken ob Überspringen im Haus weiterhin verboten ist
 Signal wenn eine Figure ins Haus geht
 output komprimieren
 3 Spieler auf 4 Spieler Feld

@@ -12,10 +12,12 @@ try:
     from .bin.Game_class import Game_Mode
     from .bin.Simulate_Game import GameSession, HumanAgent, RandomAgent
     from .board_view import BoardView
+    from .sound import VolumeButton, play_ping
 except ImportError:
     from bin.Game_class import Game_Mode
     from bin.Simulate_Game import GameSession, HumanAgent, RandomAgent
     from board_view import BoardView
+    from sound import VolumeButton, play_ping
 
 
 CLASSIC_DEFAULTS = {
@@ -30,6 +32,7 @@ CLASSIC_DEFAULTS = {
 }
 GAME_RESTART_DELAY_MS = 5000
 BANNER_STEP_MS = 30
+DEFAULT_VOLUME_LEVEL = 2
 FRAME_SPEEDS = {
     'Skip': None,
     'Manual': None,
@@ -139,6 +142,7 @@ class PvEWindow:
         self.saved_path = None
         self.game_end_handled = False
         self.games_finished = 0
+        self.volume_level = DEFAULT_VOLUME_LEVEL
         self._build_game_panel()
         self.status_var.set('Select a game mode to start')
         if self.game_modes:
@@ -241,6 +245,8 @@ class PvEWindow:
             state='disabled'
         )
         self.step_button.pack(side='left', padx=4)
+        self.volume_button = VolumeButton(speed_controls, level=self.volume_level)
+        self.volume_button.pack(side='left', padx=(10, 0))
         self.canvas = tk.Canvas(self.game_frame, background='white', highlightthickness=1, highlightbackground='#cbd5e1')
         self.canvas.grid(row=1, column=0, sticky='nsew')
         self.board = BoardView(self.canvas)
@@ -333,6 +339,7 @@ class PvEWindow:
             self.status_var.set('Dice input exhausted')
             return
 
+        self._play_house_sound(result)
         self.status_var.set(f"{result['player']} rolled {', '.join(map(str, result['rolls']))}")
         if self.skip_animation:
             self.manual_mode = False
@@ -568,6 +575,7 @@ class PvEWindow:
         self.pending_player = None
         self.pending_actions = []
         self.pending_action_labels = []
+        self._play_house_sound(result)
         self.status_var.set(f"{result['player']} selected a move")
         if self.skip_animation:
             self._render_state(result['state'])
@@ -590,6 +598,15 @@ class PvEWindow:
         else:
             self._render_state(result['state'])
             self.after_id = self.root.after(self.frame_delay, self._finish_animated_turn)
+
+    def _play_house_sound(self, result):
+        entered_house = any(
+            isinstance(move['to'], str) and move['to'].startswith('house')
+            and not (isinstance(move['from'], str) and move['from'].startswith('house'))
+            for move in result.get('moves', [])
+        )
+        if entered_house:
+            play_ping(self.volume_button.level)
 
     def _render_state(self, state):
         self.display_state = state

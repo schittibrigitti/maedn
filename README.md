@@ -101,6 +101,7 @@ MÄDN/
     ├── maedn_PvE.py         # Tkinter-GUI: Mensch vs. Bots
     ├── game_mode.json       # benannte PvE-Spielmodi mit Parametern
     ├── board_view.py        # BoardView: Zeichnen des Spielfelds (Canvas)
+    ├── sound.py             # Ping-Ton (winsound, nur Windows) und Lautsprecher-Button (VolumeButton)
     ├── maedn_visualization.py  # Replay-Fenster für gespeicherte Logs
     ├── maedn_statistic.py   # Statistiken/Plots über Log-Ordner
     ├── maedn_PvE_statistic.py  # Siegverteilung der PvE-Partien (PNG)
@@ -253,6 +254,9 @@ werden beim nächsten Programmstart eingelesen.
 
 Die übrigen Modi in `game_mode.json` haben noch keine Logs. PvE-Logs und Siegstatistiken verwenden den Modusnamen als Ordnernamen; ältere Ordner (Parameterstring, `modusN`) wurden zusammengeführt. Ältere Ordner mit höchstens zwei Partien bleiben unverändert.
 Hilfsfunktionen: `create_game`, `parameters_for_game`, `create_agents`, `save_pve_game`.
+
+### `maedpy/sound.py`
+Erzeugt einen Ping (WAV im Speicher) in 3 Lautstärken und spielt ihn, sobald im PvE-Spiel eine Figur ins Haus einzieht. Der Lautsprecher-Button im Header schaltet per Klick durch 0 (durchgestrichen) → 1 → 2 → 3 (je eine Schallwelle mehr). Auf Nicht-Windows-Systemen bleibt das Spiel stumm.
 
 ### `maedpy/board_view.py` – `BoardView`
 Zeichnet Ring, Häuser, Figuren, Würfel und Zugpfeile auf einem `tk.Canvas`; enthält
